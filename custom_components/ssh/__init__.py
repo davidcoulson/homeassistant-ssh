@@ -307,7 +307,7 @@ def async_register_services(hass: HomeAssistant, domain: str):
     def get_response(coro: Coroutine):
         @wraps(coro)
         async def wrapper(call: ServiceCall) -> ServiceResponse | None:
-            entry_ids = await async_extract_config_entry_ids(hass, call)
+            entry_ids = await async_extract_config_entry_ids(call)
             data = await asyncio.gather(
                 *(coro(hass.data[domain][entry_id], call) for entry_id in entry_ids)
             )
