@@ -1,0 +1,14 @@
+{
+  "entity": {
+    "button": {
+      "power": {
+        "default": "mdi:power"
+      }
+    },
+    "switch": {
+      "power": {
+        "default": "mdi:power"
+      }
+    }
+  }
+}

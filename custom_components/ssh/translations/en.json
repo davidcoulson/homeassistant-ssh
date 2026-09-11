@@ -47,7 +47,25 @@
                     "password": "Password",
                     "port": "Port",
                     "username": "Username"
+                },
+                "data_description": {
+                    "host": "Hostname or IP address of the device to connect to over SSH.",
+                    "key_filename": "Path to a private key file on the Home Assistant host, used instead of a password.",
+                    "host_keys_filename": "Path to a known_hosts-style file used to verify the device's host key.",
+                    "invoke_shell": "Runs commands through an interactive shell channel instead of one-off exec channels. Experimental: some devices behave differently under a shell, so only enable this if plain command execution doesn't work."
                 }
+            }
+        }
+    },
+    "entity": {
+        "button": {
+            "power": {
+                "name": "Power"
+            }
+        },
+        "switch": {
+            "power": {
+                "name": "Power"
             }
         }
     },

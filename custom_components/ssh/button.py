@@ -6,6 +6,7 @@ from ssh_terminal_manager import ActionKey
 
 from homeassistant.components.button import ENTITY_ID_FORMAT, ButtonEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -60,10 +61,8 @@ class Entity(BaseActionEntity, ButtonEntity):
 class PowerEntity(BaseEntity, ButtonEntity):
     _entity_id_format = ENTITY_ID_FORMAT
     _attr_name = "Power"
-
-    @property
-    def icon(self) -> str:
-        return "mdi:power"
+    _attr_translation_key = "power"
+    _attr_entity_category = EntityCategory.CONFIG
 
     @property
     def available(self) -> bool:

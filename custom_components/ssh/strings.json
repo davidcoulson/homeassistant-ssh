@@ -13,6 +13,12 @@
           "add_host_keys": "Automatically add key to host keys file",
           "load_system_host_keys": "Load system host keys",
           "invoke_shell": "Invoke shell (experimental)"
+        },
+        "data_description": {
+          "host": "Hostname or IP address of the device to connect to over SSH.",
+          "key_filename": "Path to a private key file on the Home Assistant host, used instead of a password.",
+          "host_keys_filename": "Path to a known_hosts-style file used to verify the device's host key.",
+          "invoke_shell": "Runs commands through an interactive shell channel instead of one-off exec channels. Experimental: some devices behave differently under a shell, so only enable this if plain command execution doesn't work."
         }
       },
       "mac_address": {
@@ -49,6 +55,18 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
       "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
       "reconf_successful": "Reconfiguration was successful"
+    }
+  },
+  "entity": {
+    "button": {
+      "power": {
+        "name": "Power"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      }
     }
   },
   "options": {

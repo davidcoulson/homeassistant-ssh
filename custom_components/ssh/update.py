@@ -12,6 +12,7 @@ from homeassistant.components.update import (
     UpdateEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -59,6 +60,7 @@ async def async_get_entities(
 
 class Entity(BaseSensorEntity, UpdateEntity):
     _entity_id_format = ENTITY_ID_FORMAT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _sensor: VersionSensor
 
     def __init__(self, entry_data: EntryData, sensor: VersionSensor) -> None:

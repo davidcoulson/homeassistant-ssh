@@ -8,12 +8,13 @@
   "dependencies": [],
   "documentation": "https://github.com/zhbjsh/homeassistant-ssh",
   "homekit": {},
+  "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/zhbjsh/homeassistant-ssh/issues",
   "requirements": [
     "ssh-terminal-manager==2.0.2"
   ],
   "ssdp": [],
-  "version": "1.3.2",
+  "version": "1.3.3",
   "zeroconf": []
 }
