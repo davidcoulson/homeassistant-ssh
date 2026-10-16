@@ -629,7 +629,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return None
 
-    def get_options(self, manager: SSHManager) -> dict:
+    def get_options(self, manager: Collection) -> dict:
         """Get options from manager."""
         converter = Converter(self.hass)
         return {
@@ -662,13 +662,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             invoke_shell=data[CONF_INVOKE_SHELL],
         )
 
+        collection = (
+            getattr(default_collections, key)
+            if (key := data[CONF_DEFAULT_COMMANDS]) != "none"
+            else None
+        )
+        if collection:
+            # Discovery also substitutes device output (e.g. interface names).
+            # Copy defaults through the guarded integration command classes.
+            collection = Converter(self.hass).get_collection(self.get_options(collection))
         manager = SSHManager(
             terminal,
-            collection=(
-                getattr(default_collections, key)
-                if (key := data[CONF_DEFAULT_COMMANDS]) != "none"
-                else None
-            ),
+            collection=collection,
             logger=PayloadFreeLogger(self.logger),
         )
 

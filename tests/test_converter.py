@@ -65,3 +65,40 @@ def test_reset_preserves_retained_command_metadata(converter_namespace, reset_de
     retained = 'custom' if reset_defaults else 'default'
     sensors = [s for c in flow._data['sensor_commands'] for s in c['sensors'] if s.get('key') == retained]
     assert sensors == [sensor(retained)]
+
+
+@pytest.mark.asyncio
+async def test_initial_discovery_uses_guarded_default_commands(converter_namespace):
+    import ast
+    from unittest.mock import AsyncMock, Mock
+    from ssh_terminal_manager import ExecutionError, default_collections
+
+    tree = ast.parse((ROOT / 'custom_components/ssh/config_flow.py').read_text())
+    cls = next(node for node in tree.body if getattr(node, 'name', '') == 'ConfigFlow')
+    method = next(node for node in cls.body if getattr(node, 'name', '') == 'async_validate_user')
+    body = [ast.ImportFrom(module='__future__', names=[ast.alias('annotations')], level=0), method]
+    converter = converter_namespace['Converter'](None)
+    options = lambda collection: dict(
+        action_commands=[converter.get_action_command_config(command) for command in collection.action_commands],
+        sensor_commands=[converter.get_sensor_command_config(command) for command in collection.sensor_commands],
+    )
+    captured = []
+
+    def manager_factory(terminal, collection, **kwargs):
+        captured.append(collection)
+        manager = AsyncMock()
+        manager.__aenter__.return_value = manager
+        return manager
+
+    ns = {**converter_namespace, **{name: name[5:].lower() for name in ('CONF_HOST', 'CONF_PORT', 'CONF_USERNAME', 'CONF_PASSWORD', 'CONF_KEY_FILENAME', 'CONF_HOST_KEYS_FILENAME', 'CONF_ADD_HOST_KEYS', 'CONF_LOAD_SYSTEM_HOST_KEYS', 'CONF_INVOKE_SHELL', 'CONF_DEFAULT_COMMANDS', 'CONF_MAC', 'CONF_NAME')},
+          'SSHTerminal': Mock(), 'SSHManager': manager_factory, 'default_collections': default_collections, 'PayloadFreeLogger': Mock()}
+    exec(compile(ast.fix_missing_locations(ast.Module(body=body, type_ignores=[])), 'config_flow.py', 'exec'), ns)
+    flow = NS(hass=None, logger=Mock(), get_options=lambda obj: options(obj) if hasattr(obj, 'sensor_commands_by_key') else {}, get_mac_address=Mock(), async_get_hostname=AsyncMock())
+    # Use a concrete options provider for the copied defaults and final fake manager.
+    flow.get_options = lambda obj: options(obj) if isinstance(obj, library.Collection) else {}
+    await ns['async_validate_user'](flow, dict(host='fake', port=22, default_commands='linux', add_host_keys=False, load_system_host_keys=False, invoke_shell=False))
+    command = next(command for command in captured[0].sensor_commands if '&{network_interface}' in command.string)
+    manager = NS(async_poll_sensors=AsyncMock(return_value=([NS(key='network_interface', value='eth0;id')], [])))
+    with pytest.raises(ExecutionError):
+        await command.async_render_string(manager)
+    assert all(isinstance(command, guarded.SensorCommand) for command in captured[0].sensor_commands)
