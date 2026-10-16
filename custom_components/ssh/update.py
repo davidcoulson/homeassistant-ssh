@@ -65,7 +65,8 @@ class Entity(BaseSensorEntity, UpdateEntity):
 
     def __init__(self, entry_data: EntryData, sensor: VersionSensor) -> None:
         super().__init__(entry_data, sensor)
-        self._latest_sensor = self._manager.sensors_by_key.get(sensor.latest)
+        self._latest_sensor = None
+        self._latest_parent_unsubscribers = []
 
     @property
     def supported_features(self) -> UpdateEntityFeature:
@@ -83,7 +84,8 @@ class Entity(BaseSensorEntity, UpdateEntity):
 
     @property
     def latest_version(self) -> str | None:
-        return self._latest_sensor.value if self._latest_sensor else None
+        latest_sensor = self._manager.sensors_by_key.get(self._sensor.latest)
+        return latest_sensor.value if latest_sensor else None
 
     def version_is_newer(self, latest_version: str, installed_version: str) -> bool:
         return latest_version != installed_version
@@ -97,11 +99,34 @@ class Entity(BaseSensorEntity, UpdateEntity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
 
-        if self._latest_sensor:
-            self._latest_sensor.on_update.subscribe(self._handle_sensor_update)
+        for sensor in self._manager.sensors_by_key.values():
+            if sensor.dynamic and self._sensor.latest.startswith(f"{sensor.key}_"):
+                self._latest_parent_unsubscribers.append(
+                    sensor.on_update.subscribe(self._handle_latest_parent_update)
+                )
+        self._sync_latest_sensor()
 
-    async def async_will_remove_from_hass(self) -> None:
+    def _sync_latest_sensor(self) -> None:
+        latest_sensor = self._manager.sensors_by_key.get(self._sensor.latest)
+        if latest_sensor is self._latest_sensor:
+            return
         if self._latest_sensor:
             self._latest_sensor.on_update.unsubscribe(self._handle_sensor_update)
+        self._latest_sensor = latest_sensor
+        if latest_sensor:
+            latest_sensor.on_update.subscribe(self._handle_sensor_update)
+
+    def _handle_latest_parent_update(self, sensor: VersionSensor) -> None:
+        # Parent updates run after child creation/removal and value updates.
+        self._sync_latest_sensor()
+        self.schedule_update_ha_state()
+
+    async def async_will_remove_from_hass(self) -> None:
+        for unsubscribe in self._latest_parent_unsubscribers:
+            unsubscribe()
+        self._latest_parent_unsubscribers.clear()
+        if self._latest_sensor:
+            self._latest_sensor.on_update.unsubscribe(self._handle_sensor_update)
+            self._latest_sensor = None
 
         await super().async_will_remove_from_hass()
