@@ -56,6 +56,7 @@ def get_value_renderer(hass: HomeAssistant, value_template: str) -> Callable:
         template = Template(value_template, hass)
         return template.async_render(variables={"value": value}, parse_result=False)
 
+    async_renderer.value_template = value_template
     return async_renderer
 
 

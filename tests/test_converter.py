@@ -1,0 +1,67 @@
+import re
+from types import SimpleNamespace as NS
+
+import jinja2
+import pytest
+import ssh_terminal_manager as library
+
+from source import ROOT, definitions
+from test_command import module as guarded
+
+
+class Template:
+    def __init__(self, source, hass):
+        self.template = jinja2.Template(source)
+
+    def async_render(self, variables=None, **kwargs):
+        return self.template.render(**(variables or {}))
+
+
+@pytest.fixture
+def converter_namespace():
+    constants = {name: name.removeprefix('CONF_').lower() for name in re.findall(r'\bCONF_\w+', (ROOT / 'custom_components/ssh/converter.py').read_text())}
+    ns = {**vars(library), **constants, 'Command': guarded.Command, 'ActionCommand': guarded.ActionCommand, 'SensorCommand': guarded.SensorCommand,
+          'SENSOR_ATTR_DEFAULTS': {}, 'ACTION_ATTR_DEFAULTS': {},
+          'SENSOR_ATTR_KEYS': ('device_class', 'icon', 'entity_registry_enabled_default', 'suggested_unit_of_measurement', 'suggested_display_precision', 'mode'),
+          'ACTION_ATTR_KEYS': ('device_class', 'icon', 'entity_registry_enabled_default')}
+    ns.update(definitions('helpers.py', ['get_command_renderer', 'get_value_renderer'], {'Template': Template}))
+    return definitions('converter.py', ['remove_none_items', 'Converter'], ns)
+
+
+@pytest.mark.parametrize('sensor_type', ['text', 'number', 'binary', 'version'])
+def test_templates_and_attributes_survive_command_roundtrip(converter_namespace, sensor_type):
+    converter = converter_namespace['Converter'](None)
+    attributes = dict(mode='password', icon='mdi:lock', device_class='test', entity_registry_enabled_default=False, suggested_unit_of_measurement='MB', suggested_display_precision=2)
+    sensor = dict(type=sensor_type, key='secret', name='Secret', value_template='{{ value | trim }}', command_set='set @{value}', timeout_set=5, **attributes)
+    if sensor_type == 'binary':
+        sensor.update(command_on='on @{id}', command_off='off @{id}', timeout_on=1, timeout_off=2)
+    command_data = dict(command='poll', timeout=10, scan_interval=20, separator='|', sensors=[sensor])
+    command = guarded.SensorCommand(**converter.get_sensor_command_kwargs(command_data))
+    assert converter.get_sensor_command_config(command) == command_data
+    assert command.sensors[0].renderer('  secret  ') == 'secret'
+    action_data = dict(command='run @{token}', key='run', name='Run', icon='mdi:lock', device_class='restart', entity_registry_enabled_default=False)
+    action = guarded.ActionCommand(**converter.get_action_command_kwargs(action_data))
+    assert converter.get_action_command_config(action) == action_data
+
+
+@pytest.mark.parametrize('reset_defaults,remove_custom', [(True, False), (False, True)])
+def test_reset_preserves_retained_command_metadata(converter_namespace, reset_defaults, remove_custom):
+    import ast
+    from source import definitions
+
+    # Execute the actual reset method without requiring HA's options-flow runtime.
+    tree = ast.parse((ROOT / 'custom_components/ssh/config_flow.py').read_text())
+    flow_class = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'OptionsFlow')
+    reset = next(n for n in flow_class.body if getattr(n, 'name', '') == 'reset_commands')
+    ns = dict(converter_namespace)
+    exec(compile(ast.Module(body=[reset], type_ignores=[]), 'config_flow.py', 'exec'), ns)
+    converter = ns['Converter'](None)
+    def sensor(key):
+        return dict(type='text', key=key, name=key, value_template='{{ value }}', mode='password', icon='mdi:lock')
+    data = dict(action_commands=[], sensor_commands=[dict(command='poll', sensors=[sensor('default'), sensor('custom')])])
+    default = converter.get_collection(dict(action_commands=[], sensor_commands=[dict(command='poll', sensors=[sensor('default')])]))
+    flow = NS(hass=None, _data=data, _default_collection=default)
+    ns['reset_commands'](flow, reset_defaults, remove_custom)
+    retained = 'custom' if reset_defaults else 'default'
+    sensors = [s for c in flow._data['sensor_commands'] for s in c['sensors'] if s.get('key') == retained]
+    assert sensors == [sensor(retained)]

@@ -145,6 +145,8 @@ class Converter:
                 CONF_KEY: sensor.key,
                 CONF_DYNAMIC: sensor.dynamic is True or None,
                 CONF_UNIT_OF_MEASUREMENT: sensor.unit,
+                CONF_VALUE_TEMPLATE: getattr(sensor.renderer, "value_template", None),
+                **{key: sensor.attributes[key] for key in SENSOR_ATTR_KEYS if key in sensor.attributes},
                 CONF_COMMAND_SET: sensor.command_set.string
                 if sensor.command_set
                 else None,
@@ -296,6 +298,7 @@ class Converter:
                 **self._get_command_config(command),
                 CONF_NAME: command.name,
                 CONF_KEY: command.key,
+                **{key: command.attributes[key] for key in ACTION_ATTR_KEYS if key in command.attributes},
             }
         )
 
