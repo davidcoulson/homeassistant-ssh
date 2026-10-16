@@ -125,6 +125,8 @@ from .const import (
 )
 from .converter import Converter
 
+from .logger import PayloadFreeLogger
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -667,7 +669,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if (key := data[CONF_DEFAULT_COMMANDS]) != "none"
                 else None
             ),
-            logger=self.logger,
+            logger=PayloadFreeLogger(self.logger),
         )
 
         await manager.async_load_host_keys()

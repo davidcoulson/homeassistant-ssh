@@ -81,6 +81,8 @@ from .helpers import (
     get_device_sensor_update_handler,
 )
 
+from .logger import PayloadFreeLogger
+
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [
@@ -221,7 +223,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         disconnect_mode=options[CONF_DISCONNECT_MODE],
         mac_address=data[CONF_MAC],
         collection=collection,
-        logger=_LOGGER,
+        logger=PayloadFreeLogger(_LOGGER),
     )
 
     await manager.async_load_host_keys()
