@@ -7,7 +7,6 @@ import logging
 
 from ssh_terminal_manager import (
     ActionKey,
-    Command,
     CommandError,
     CommandOutput,
     SensorKey,
@@ -47,6 +46,7 @@ from homeassistant.helpers.service import (
 )
 
 from .base_entity import BaseSensorEntity
+from .command import Command
 from .const import (
     CONF_ALLOW_TURN_OFF,
     CONF_COMMAND_TIMEOUT,

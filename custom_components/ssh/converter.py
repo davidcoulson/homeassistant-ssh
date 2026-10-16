@@ -2,14 +2,11 @@ from __future__ import annotations
 
 from ssh_terminal_manager import (
     PLACEHOLDER_KEY,
-    ActionCommand,
     ActionKey,
     BinarySensor,
     Collection,
-    Command,
     NumberSensor,
     Sensor,
-    SensorCommand,
     SensorKey,
     TextSensor,
     VersionSensor,
@@ -37,6 +34,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 
+from .command import ActionCommand, Command, SensorCommand
 from .const import (
     CONF_ACTION_COMMANDS,
     CONF_COMMAND_SET,
