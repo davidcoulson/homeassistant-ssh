@@ -55,7 +55,8 @@
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
       "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
-      "reconf_successful": "Reconfiguration was successful"
+      "reconf_successful": "Reconfiguration was successful",
+      "device_identity_mismatch": "The detected device does not match this entry, or its identity could not be verified"
     }
   },
   "entity": {

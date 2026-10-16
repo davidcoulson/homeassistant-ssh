@@ -717,6 +717,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not self._existing_entry:
             return await self.async_step_mac_address()
 
+        detected_mac = self._data.get(CONF_MAC)
+        if not detected_mac or format_mac(detected_mac) != format_mac(
+            self._existing_entry.data[CONF_MAC]
+        ):
+            return self.async_abort(reason="device_identity_mismatch")
+
         return self.async_update_reload_and_abort(
             self._existing_entry,
             data={
@@ -738,6 +744,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         placeholders: dict[str, str] = {}
         if user_input is not None:
+            if self._existing_entry:
+                user_input = {
+                    **user_input,
+                    CONF_DEFAULT_COMMANDS: self._existing_entry.data[CONF_DEFAULT_COMMANDS],
+                }
             self._data = user_input
             try:
                 if user_input[CONF_ADD_HOST_KEYS] and not user_input.get(
@@ -771,12 +782,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 return await self.async_handle_step_user_success()
 
+        schema = CONFIG_FLOW_USER_SCHEMA
+        if self._existing_entry:
+            schema = vol.Schema({
+                key: value for key, value in schema.schema.items()
+                if str(key) != CONF_DEFAULT_COMMANDS
+            })
         return self.async_show_form(
             step_id="user",
             errors=errors,
             description_placeholders=placeholders,
             data_schema=self.add_suggested_values_to_schema(
-                CONFIG_FLOW_USER_SCHEMA,
+                schema,
                 {
                     **self._data,
                     CONF_PORT: self._data.get(CONF_PORT, DEFAULT_PORT),
