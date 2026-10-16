@@ -291,25 +291,35 @@ async def async_initialize_entry(
     hass.data.setdefault(entry.domain, {})
     hass.data[entry.domain][entry.entry_id] = entry_data
 
-    await state_coordinator.async_config_entry_first_refresh()
+    try:
+        await state_coordinator.async_config_entry_first_refresh()
 
-    device_registry = dr.async_get(hass)
-    entry_data.device_entry = device_registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(entry.domain, entry.unique_id)},
-        name=manager.name,
-        **get_device_info(manager),
-    )
+        device_registry = dr.async_get(hass)
+        entry_data.device_entry = device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(entry.domain, entry.unique_id)},
+            name=manager.name,
+            **get_device_info(manager),
+        )
 
-    handle_device_sensor_update = get_device_sensor_update_handler(
-        hass, entry_data, device_registry
-    )
+        handle_device_sensor_update = get_device_sensor_update_handler(
+            hass, entry_data, device_registry
+        )
 
-    for key in DEVICE_SENSOR_KEYS:
-        if sensor := manager.sensors_by_key.get(key):
-            sensor.on_update.subscribe(handle_device_sensor_update)
+        for key in DEVICE_SENSOR_KEYS:
+            if sensor := manager.sensors_by_key.get(key):
+                entry_data.unsubscribe_callbacks.append(
+                    sensor.on_update.subscribe(handle_device_sensor_update)
+                )
 
-    await hass.config_entries.async_forward_entry_setups(entry, platforms)
+        await hass.config_entries.async_forward_entry_setups(entry, platforms)
+    except BaseException:
+        hass.data[entry.domain].pop(entry.entry_id, None)
+        try:
+            await entry_data.async_shutdown()
+        except Exception:
+            _LOGGER.error("Failed to shut down SSH manager after setup failure")
+        raise
 
 
 def async_register_services(hass: HomeAssistant, domain: str):
