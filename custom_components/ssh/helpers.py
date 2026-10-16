@@ -3,13 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 import shlex
 
-from ssh_terminal_manager import ActionCommand, Command, Sensor, SensorKey, SSHManager
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceRegistry
 from homeassistant.helpers.entity_platform import EntityPlatform
 from homeassistant.helpers.template import Template
 from homeassistant.util.unit_conversion import InformationConverter
+from ssh_terminal_manager import ActionCommand, Command, Sensor, SensorKey, SSHManager
 
 from .base_entity import BaseSensorEntity
 from .entry_data import EntryData

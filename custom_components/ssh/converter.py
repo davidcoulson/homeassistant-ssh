@@ -1,17 +1,5 @@
 from __future__ import annotations
 
-from ssh_terminal_manager import (
-    PLACEHOLDER_KEY,
-    ActionKey,
-    BinarySensor,
-    Collection,
-    NumberSensor,
-    Sensor,
-    SensorKey,
-    TextSensor,
-    VersionSensor,
-)
-
 from homeassistant.components.button import ButtonDeviceClass
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import (
@@ -33,6 +21,17 @@ from homeassistant.const import (
     CONF_VALUE_TEMPLATE,
 )
 from homeassistant.core import HomeAssistant
+from ssh_terminal_manager import (
+    PLACEHOLDER_KEY,
+    ActionKey,
+    BinarySensor,
+    Collection,
+    NumberSensor,
+    Sensor,
+    SensorKey,
+    TextSensor,
+    VersionSensor,
+)
 
 from .command import ActionCommand, Command, SensorCommand
 from .const import (
@@ -146,7 +145,11 @@ class Converter:
                 CONF_DYNAMIC: sensor.dynamic is True or None,
                 CONF_UNIT_OF_MEASUREMENT: sensor.unit,
                 CONF_VALUE_TEMPLATE: getattr(sensor.renderer, "value_template", None),
-                **{key: sensor.attributes[key] for key in SENSOR_ATTR_KEYS if key in sensor.attributes},
+                **{
+                    key: sensor.attributes[key]
+                    for key in SENSOR_ATTR_KEYS
+                    if key in sensor.attributes
+                },
                 CONF_COMMAND_SET: sensor.command_set.string
                 if sensor.command_set
                 else None,
@@ -298,7 +301,11 @@ class Converter:
                 **self._get_command_config(command),
                 CONF_NAME: command.name,
                 CONF_KEY: command.key,
-                **{key: command.attributes[key] for key in ACTION_ATTR_KEYS if key in command.attributes},
+                **{
+                    key: command.attributes[key]
+                    for key in ACTION_ATTR_KEYS
+                    if key in command.attributes
+                },
             }
         )
 

@@ -106,6 +106,8 @@ You can test new commands with the [`ssh.execute_command`](#execute-command-sshe
 
 Sensors of the same device can be accessed in commands with `&{my_sensor_key}`. The integration will poll the required sensors once before every execution and include their values in the command ([example](#ip-address)).
 
+Command templates render before `@{...}` and `&{...}` substitutions. Substituted values, including dynamic IDs, must be nonempty and contain only ASCII letters, digits, `_`, `.`, `/`, `:`, or `-`. Other values (including spaces and quotes) fail before execution. This conservative guard applies to all target shells: the current command API cannot safely quote arbitrary data without knowing the shell and the placeholder's quote context. Keep templates administrator-authored and use substitutions only as data arguments.
+
 ##### Include variables
 
 Variables can be passed to action commands (but not sensor commands) and accessed with `@{my_variable_name}`. Action commands that require variables can only be executed by calling the [`ssh.run_action`](#run-action-sshrun_action) service ([example](#add-a-note-to-a-file)).

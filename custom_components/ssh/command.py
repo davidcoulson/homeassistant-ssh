@@ -6,8 +6,14 @@ import re
 
 from ssh_terminal_manager import (
     ActionCommand as ManagerActionCommand,
+)
+from ssh_terminal_manager import (
     Command as ManagerCommand,
+)
+from ssh_terminal_manager import (
     ExecutionError,
+)
+from ssh_terminal_manager import (
     SensorCommand as ManagerSensorCommand,
 )
 

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from ssh_terminal_manager import VersionSensor
-
 from homeassistant.components.update import (
     ENTITY_ID_FORMAT,
     UpdateEntity,
@@ -16,6 +14,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from ssh_terminal_manager import VersionSensor
 
 from .base_entity import BaseSensorEntity
 from .entry_data import EntryData

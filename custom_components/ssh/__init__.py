@@ -1,20 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Coroutine
 from functools import wraps
-import logging
 
-from ssh_terminal_manager import (
-    ActionKey,
-    CommandError,
-    CommandOutput,
-    SensorKey,
-    SSHManager,
-    SSHTerminal,
-)
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -43,6 +34,14 @@ from homeassistant.helpers.service import (
     async_extract_config_entry_ids,
     async_extract_entities,
     async_register_admin_service,
+)
+from ssh_terminal_manager import (
+    ActionKey,
+    CommandError,
+    CommandOutput,
+    SensorKey,
+    SSHManager,
+    SSHTerminal,
 )
 
 from .base_entity import BaseSensorEntity
@@ -80,7 +79,6 @@ from .helpers import (
     get_device_info,
     get_device_sensor_update_handler,
 )
-
 from .logger import PayloadFreeLogger
 
 _LOGGER = logging.getLogger(__name__)
@@ -317,7 +315,7 @@ async def async_initialize_entry(
         hass.data[entry.domain].pop(entry.entry_id, None)
         try:
             await entry_data.async_shutdown()
-        except Exception:
+        except Exception:  # noqa: BLE001 - preserve the original setup failure
             _LOGGER.error("Failed to shut down SSH manager after setup failure")
         raise
 
@@ -426,7 +424,7 @@ def async_register_services(hass: HomeAssistant, domain: str):
         ]
         selected_entities = await async_extract_entities(entities, call)
         sensor_keys = [entity.key for entity in selected_entities]
-        sensors, errors = await entry_data.manager.async_poll_sensors(
+        _sensors, errors = await entry_data.manager.async_poll_sensors(
             sensor_keys,
             raise_errors=False,
         )
@@ -456,7 +454,7 @@ def async_register_services(hass: HomeAssistant, domain: str):
         if any(e.entity_id not in values_by_entity_id for e in selected_entities):
             raise ServiceValidationError("Not all values provided")
         sensor_keys = [entity.key for entity in selected_entities]
-        sensors, errors = await entry_data.manager.async_set_sensor_values(
+        _sensors, errors = await entry_data.manager.async_set_sensor_values(
             sensor_keys,
             [values_by_entity_id[entity.entity_id] for entity in selected_entities],
             raise_errors=False,

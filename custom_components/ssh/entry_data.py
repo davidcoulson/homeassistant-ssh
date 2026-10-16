@@ -1,11 +1,10 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from ssh_terminal_manager import ActionKey, SensorKey, SSHManager
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.helpers.device_registry import DeviceEntry
+from ssh_terminal_manager import ActionKey, SensorKey, SSHManager
 
 from .coordinator import BaseCoordinator, SensorCommandCoordinator, StateCoordinator
 
