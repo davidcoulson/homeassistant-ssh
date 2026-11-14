@@ -483,7 +483,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_RUN_ACTION,
         run_action,
@@ -499,7 +500,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_SET_VALUE,
         set_value,
@@ -507,7 +509,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_TURN_ON,
         turn_on,
@@ -515,7 +518,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_TURN_OFF,
         turn_off,
@@ -523,7 +527,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_RESTART,
         restart,
