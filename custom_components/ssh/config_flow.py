@@ -194,6 +194,10 @@ def _validate_sensor(data: dict) -> dict:
     return _get_sensor_schema(data)(data)
 
 
+class HostKeysFileRequiredError(Exception):
+    """Raised when add host keys is enabled without a host keys file."""
+
+
 class ListSelector(ObjectSelector):
     def __init__(
         self, schema: vol.Schema, config: Mapping[str, Any] | None = None
@@ -701,7 +705,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data = user_input
             try:
+                if user_input[CONF_ADD_HOST_KEYS] and not user_input.get(
+                    CONF_HOST_KEYS_FILENAME
+                ):
+                    # Accepted keys are only kept in a file; runtime would reject them.
+                    raise HostKeysFileRequiredError
                 self._data, self._options = await self.async_validate_user(user_input)
+            except HostKeysFileRequiredError:
+                errors["base"] = "host_keys_file_required_error"
             except PermissionError:
                 errors["base"] = "permission_error"
             except OfflineError as exc:
