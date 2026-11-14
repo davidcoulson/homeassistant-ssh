@@ -41,6 +41,7 @@ from homeassistant.helpers import device_registry as dr, entity_platform
 from homeassistant.helpers.service import (
     async_extract_config_entry_ids,
     async_extract_entities,
+    async_register_admin_service,
 )
 
 from .base_entity import BaseSensorEntity
@@ -458,7 +459,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
     async def restart(entry_data: EntryData, call: ServiceCall) -> CommandOutput:
         return await entry_data.state_coordinator.async_restart()
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_EXECUTE_COMMAND,
         execute_command,
