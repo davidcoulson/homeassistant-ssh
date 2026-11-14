@@ -309,9 +309,16 @@ def async_register_services(hass: HomeAssistant, domain: str):
         @wraps(coro)
         async def wrapper(call: ServiceCall) -> ServiceResponse | None:
             entry_ids = await async_extract_config_entry_ids(call)
-            data = await asyncio.gather(
-                *(coro(hass.data[domain][entry_id], call) for entry_id in entry_ids)
-            )
+            # Targets may include other integrations' entries or entries not loaded.
+            entries_data = [
+                entry_data
+                for entry_id in entry_ids
+                if (entry_data := hass.data.get(domain, {}).get(entry_id))
+                and entry_data.device_entry
+            ]
+            if not entries_data:
+                raise ServiceValidationError("No SSH device found in target")
+            data = await asyncio.gather(*(coro(d, call) for d in entries_data))
             return (
                 {"results": [result for results in data for result in results]}
                 if call.return_response
