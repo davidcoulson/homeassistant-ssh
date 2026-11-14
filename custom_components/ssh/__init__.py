@@ -8,6 +8,7 @@ import logging
 from ssh_terminal_manager import (
     ActionKey,
     Command,
+    CommandError,
     CommandOutput,
     SensorKey,
     SSHManager,
@@ -37,10 +38,12 @@ from homeassistant.core import (
     ServiceValidationError,
     SupportsResponse,
 )
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_platform
 from homeassistant.helpers.service import (
     async_extract_config_entry_ids,
     async_extract_entities,
+    async_register_admin_service,
 )
 
 from .base_entity import BaseSensorEntity
@@ -204,6 +207,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         invoke_shell=data[CONF_INVOKE_SHELL],
     )
 
+    try:
+        collection = Converter(hass).get_collection(options)
+    except CommandError as exc:
+        # Templates may reference entities that are not loaded yet at startup.
+        raise ConfigEntryNotReady(f"Invalid commands: {exc}") from exc
+
     manager = SSHManager(
         terminal,
         name=data[CONF_NAME],
@@ -211,7 +220,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         allow_turn_off=options[CONF_ALLOW_TURN_OFF],
         disconnect_mode=options[CONF_DISCONNECT_MODE],
         mac_address=data[CONF_MAC],
-        collection=Converter(hass).get_collection(options),
+        collection=collection,
         logger=_LOGGER,
     )
 
@@ -308,9 +317,16 @@ def async_register_services(hass: HomeAssistant, domain: str):
         @wraps(coro)
         async def wrapper(call: ServiceCall) -> ServiceResponse | None:
             entry_ids = await async_extract_config_entry_ids(call)
-            data = await asyncio.gather(
-                *(coro(hass.data[domain][entry_id], call) for entry_id in entry_ids)
-            )
+            # Targets may include other integrations' entries or entries not loaded.
+            entries_data = [
+                entry_data
+                for entry_id in entry_ids
+                if (entry_data := hass.data.get(domain, {}).get(entry_id))
+                and entry_data.device_entry
+            ]
+            if not entries_data:
+                raise ServiceValidationError("No SSH device found in target")
+            data = await asyncio.gather(*(coro(d, call) for d in entries_data))
             return (
                 {"results": [result for results in data for result in results]}
                 if call.return_response
@@ -396,7 +412,7 @@ def async_register_services(hass: HomeAssistant, domain: str):
             if isinstance(entity, BaseSensorEntity)
             and entity.coordinator == entry_data.state_coordinator
         ]
-        selected_entities = await async_extract_entities(hass, entities, call)
+        selected_entities = await async_extract_entities(entities, call)
         sensor_keys = [entity.key for entity in selected_entities]
         sensors, errors = await entry_data.manager.async_poll_sensors(
             sensor_keys,
@@ -422,13 +438,15 @@ def async_register_services(hass: HomeAssistant, domain: str):
             if isinstance(entity, BaseSensorEntity)
             and entity.coordinator == entry_data.state_coordinator
         ]
-        selected_entities = await async_extract_entities(hass, entities, call)
-        if len(selected_entities) > len(values):
+        selected_entities = await async_extract_entities(entities, call)
+        # The helper returns entities in platform order, so pair values by entity id.
+        values_by_entity_id = dict(zip(call.data[ATTR_ENTITY_ID], values))
+        if any(e.entity_id not in values_by_entity_id for e in selected_entities):
             raise ServiceValidationError("Not all values provided")
         sensor_keys = [entity.key for entity in selected_entities]
         sensors, errors = await entry_data.manager.async_set_sensor_values(
             sensor_keys,
-            values,
+            [values_by_entity_id[entity.entity_id] for entity in selected_entities],
             raise_errors=False,
         )
         return [
@@ -456,7 +474,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
     async def restart(entry_data: EntryData, call: ServiceCall) -> CommandOutput:
         return await entry_data.state_coordinator.async_restart()
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_EXECUTE_COMMAND,
         execute_command,
@@ -464,7 +483,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_RUN_ACTION,
         run_action,
@@ -480,7 +500,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_SET_VALUE,
         set_value,
@@ -488,7 +509,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_TURN_ON,
         turn_on,
@@ -496,7 +518,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_TURN_OFF,
         turn_off,
@@ -504,7 +527,8 @@ def async_register_services(hass: HomeAssistant, domain: str):
         SupportsResponse.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         domain,
         SERVICE_RESTART,
         restart,

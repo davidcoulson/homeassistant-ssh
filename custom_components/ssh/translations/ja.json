@@ -10,6 +10,7 @@
             "connect_error": "Connection failed {details}",
             "execution_error": "Execution failed {details}",
             "host_key_unknown_error": "Host key of {host} is unknown",
+            "host_keys_file_required_error": "A host keys file is required to automatically add keys",
             "mac_address_invalid_error": "MACアドレスが無効です",
             "name_exists_error": "名前はすでに存在します",
             "offline_error": "ホスト {host} はオフラインです",
