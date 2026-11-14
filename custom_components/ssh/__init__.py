@@ -8,6 +8,7 @@ import logging
 from ssh_terminal_manager import (
     ActionKey,
     Command,
+    CommandError,
     CommandOutput,
     SensorKey,
     SSHManager,
@@ -37,6 +38,7 @@ from homeassistant.core import (
     ServiceValidationError,
     SupportsResponse,
 )
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_platform
 from homeassistant.helpers.service import (
     async_extract_config_entry_ids,
@@ -205,6 +207,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         invoke_shell=data[CONF_INVOKE_SHELL],
     )
 
+    try:
+        collection = Converter(hass).get_collection(options)
+    except CommandError as exc:
+        # Templates may reference entities that are not loaded yet at startup.
+        raise ConfigEntryNotReady(f"Invalid commands: {exc}") from exc
+
     manager = SSHManager(
         terminal,
         name=data[CONF_NAME],
@@ -212,7 +220,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         allow_turn_off=options[CONF_ALLOW_TURN_OFF],
         disconnect_mode=options[CONF_DISCONNECT_MODE],
         mac_address=data[CONF_MAC],
-        collection=Converter(hass).get_collection(options),
+        collection=collection,
         logger=_LOGGER,
     )
 
