@@ -1,20 +1,5 @@
 from __future__ import annotations
 
-from ssh_terminal_manager import (
-    PLACEHOLDER_KEY,
-    ActionCommand,
-    ActionKey,
-    BinarySensor,
-    Collection,
-    Command,
-    NumberSensor,
-    Sensor,
-    SensorCommand,
-    SensorKey,
-    TextSensor,
-    VersionSensor,
-)
-
 from homeassistant.components.button import ButtonDeviceClass
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import (
@@ -36,7 +21,19 @@ from homeassistant.const import (
     CONF_VALUE_TEMPLATE,
 )
 from homeassistant.core import HomeAssistant
+from ssh_terminal_manager import (
+    PLACEHOLDER_KEY,
+    ActionKey,
+    BinarySensor,
+    Collection,
+    NumberSensor,
+    Sensor,
+    SensorKey,
+    TextSensor,
+    VersionSensor,
+)
 
+from .command import ActionCommand, Command, SensorCommand
 from .const import (
     CONF_ACTION_COMMANDS,
     CONF_COMMAND_SET,
@@ -57,8 +54,6 @@ from .const import (
     CONF_TIMEOUT_SET,
 )
 from .helpers import (
-    SafeActionCommand,
-    SafeCommand,
     get_command_renderer,
     get_value_renderer,
 )
@@ -147,6 +142,12 @@ class Converter:
                 CONF_KEY: sensor.key,
                 CONF_DYNAMIC: sensor.dynamic is True or None,
                 CONF_UNIT_OF_MEASUREMENT: sensor.unit,
+                CONF_VALUE_TEMPLATE: getattr(sensor.renderer, "value_template", None),
+                **{
+                    key: sensor.attributes[key]
+                    for key in SENSOR_ATTR_KEYS
+                    if key in sensor.attributes
+                },
                 CONF_COMMAND_SET: sensor.command_set.string
                 if sensor.command_set
                 else None,
@@ -165,7 +166,7 @@ class Converter:
             "renderer": get_value_renderer(self._hass, value_template)
             if (value_template := data.get(CONF_VALUE_TEMPLATE))
             else None,
-            "command_set": SafeCommand(
+            "command_set": Command(
                 string,
                 timeout=data.get(CONF_TIMEOUT_SET),
                 renderer=get_command_renderer(self._hass),
@@ -243,14 +244,14 @@ class Converter:
     def _get_binary_sensor_kwargs(self, data: dict) -> dict:
         return {
             **self._get_sensor_kwargs(data),
-            "command_on": SafeCommand(
+            "command_on": Command(
                 string,
                 timeout=data.get(CONF_TIMEOUT_ON),
                 renderer=get_command_renderer(self._hass),
             )
             if (string := data.get(CONF_COMMAND_ON))
             else None,
-            "command_off": SafeCommand(
+            "command_off": Command(
                 string,
                 timeout=data.get(CONF_TIMEOUT_OFF),
                 renderer=get_command_renderer(self._hass),
@@ -298,6 +299,11 @@ class Converter:
                 **self._get_command_config(command),
                 CONF_NAME: command.name,
                 CONF_KEY: command.key,
+                **{
+                    key: command.attributes[key]
+                    for key in ACTION_ATTR_KEYS
+                    if key in command.attributes
+                },
             }
         )
 
@@ -360,7 +366,7 @@ class Converter:
         return Collection(
             "",
             [
-                SafeActionCommand(**self.get_action_command_kwargs(command_data))
+                ActionCommand(**self.get_action_command_kwargs(command_data))
                 for command_data in options[CONF_ACTION_COMMANDS]
             ],
             [

@@ -3,7 +3,8 @@
         "abort": {
             "already_configured": "デバイスはすでに設定されています",
             "reauth_successful": "再認証に成功しました",
-            "reconf_successful": "再設定に成功しました"
+            "reconf_successful": "再設定に成功しました",
+            "device_identity_mismatch": "The detected device does not match this entry, or its identity could not be verified"
         },
         "error": {
             "authentication_error": "Authentication failed {details}",

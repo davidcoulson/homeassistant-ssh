@@ -1,21 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Coroutine
 from functools import wraps
-import logging
 
-from ssh_terminal_manager import (
-    ActionKey,
-    Command,
-    CommandError,
-    CommandOutput,
-    SensorKey,
-    SSHManager,
-    SSHTerminal,
-)
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_DEVICE_ID,
@@ -39,14 +29,24 @@ from homeassistant.core import (
     SupportsResponse,
 )
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr, entity_platform
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.service import (
     async_extract_config_entry_ids,
     async_extract_entities,
     async_register_admin_service,
 )
+from ssh_terminal_manager import (
+    ActionKey,
+    CommandError,
+    CommandOutput,
+    SensorKey,
+    SSHManager,
+    SSHTerminal,
+)
 
 from .base_entity import BaseSensorEntity
+from .command import Command
 from .const import (
     CONF_ALLOW_TURN_OFF,
     CONF_COMMAND_TIMEOUT,
@@ -80,6 +80,7 @@ from .helpers import (
     get_device_info,
     get_device_sensor_update_handler,
 )
+from .logger import PayloadFreeLogger
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -221,7 +222,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         disconnect_mode=options[CONF_DISCONNECT_MODE],
         mac_address=data[CONF_MAC],
         collection=collection,
-        logger=_LOGGER,
+        logger=PayloadFreeLogger(_LOGGER),
     )
 
     await manager.async_load_host_keys()
@@ -289,25 +290,35 @@ async def async_initialize_entry(
     hass.data.setdefault(entry.domain, {})
     hass.data[entry.domain][entry.entry_id] = entry_data
 
-    await state_coordinator.async_config_entry_first_refresh()
+    try:
+        await state_coordinator.async_config_entry_first_refresh()
 
-    device_registry = dr.async_get(hass)
-    entry_data.device_entry = device_registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(entry.domain, entry.unique_id)},
-        name=manager.name,
-        **get_device_info(manager),
-    )
+        device_registry = dr.async_get(hass)
+        entry_data.device_entry = device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(entry.domain, entry.unique_id)},
+            name=manager.name,
+            **get_device_info(manager),
+        )
 
-    handle_device_sensor_update = get_device_sensor_update_handler(
-        hass, entry_data, device_registry
-    )
+        handle_device_sensor_update = get_device_sensor_update_handler(
+            hass, entry_data, device_registry
+        )
 
-    for key in DEVICE_SENSOR_KEYS:
-        if sensor := manager.sensors_by_key.get(key):
-            sensor.on_update.subscribe(handle_device_sensor_update)
+        for key in DEVICE_SENSOR_KEYS:
+            if sensor := manager.sensors_by_key.get(key):
+                entry_data.unsubscribe_callbacks.append(
+                    sensor.on_update.subscribe(handle_device_sensor_update)
+                )
 
-    await hass.config_entries.async_forward_entry_setups(entry, platforms)
+        await hass.config_entries.async_forward_entry_setups(entry, platforms)
+    except BaseException:
+        hass.data[entry.domain].pop(entry.entry_id, None)
+        try:
+            await entry_data.async_shutdown()
+        except Exception:  # noqa: BLE001 - preserve the original setup failure
+            _LOGGER.error("Failed to shut down SSH manager after setup failure")
+        raise
 
 
 def async_register_services(hass: HomeAssistant, domain: str):
@@ -316,6 +327,21 @@ def async_register_services(hass: HomeAssistant, domain: str):
     def get_response(coro: Coroutine):
         @wraps(coro)
         async def wrapper(call: ServiceCall) -> ServiceResponse | None:
+            if coro.__name__ == "set_value":
+                # Reject bad pairings before any host is written to.
+                entity_ids = call.data[ATTR_ENTITY_ID]
+                if len(entity_ids) != len(call.data[CONF_VALUES]) or len(
+                    set(entity_ids)
+                ) != len(entity_ids):
+                    raise ServiceValidationError("Provide exactly one value per entity")
+                known = {
+                    entity.entity_id
+                    for platform in entity_platform.async_get_platforms(hass, domain)
+                    for entity in platform.entities.values()
+                    if isinstance(entity, BaseSensorEntity)
+                }
+                if not known.issuperset(entity_ids):
+                    raise ServiceValidationError("Unknown SSH sensor entity")
             entry_ids = await async_extract_config_entry_ids(call)
             # Targets may include other integrations' entries or entries not loaded.
             entries_data = [
@@ -414,7 +440,7 @@ def async_register_services(hass: HomeAssistant, domain: str):
         ]
         selected_entities = await async_extract_entities(entities, call)
         sensor_keys = [entity.key for entity in selected_entities]
-        sensors, errors = await entry_data.manager.async_poll_sensors(
+        _sensors, errors = await entry_data.manager.async_poll_sensors(
             sensor_keys,
             raise_errors=False,
         )
@@ -444,7 +470,7 @@ def async_register_services(hass: HomeAssistant, domain: str):
         if any(e.entity_id not in values_by_entity_id for e in selected_entities):
             raise ServiceValidationError("Not all values provided")
         sensor_keys = [entity.key for entity in selected_entities]
-        sensors, errors = await entry_data.manager.async_set_sensor_values(
+        _sensors, errors = await entry_data.manager.async_set_sensor_values(
             sensor_keys,
             [values_by_entity_id[entity.entity_id] for entity in selected_entities],
             raise_errors=False,

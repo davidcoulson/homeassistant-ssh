@@ -3,7 +3,8 @@
         "abort": {
             "already_configured": "Device is already configured",
             "reauth_successful": "Re-authentication was successful",
-            "reconf_successful": "Reconfiguration was successful"
+            "reconf_successful": "Reconfiguration was successful",
+            "device_identity_mismatch": "The detected device does not match this entry, or its identity could not be verified"
         },
         "error": {
             "authentication_error": "Authentication failed {details}",

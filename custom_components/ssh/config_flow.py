@@ -1,33 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 import logging
 import re
+from collections.abc import Mapping
 from typing import Any
 
-from ssh_terminal_manager import (
-    DEFAULT_ADD_HOST_KEYS,
-    DEFAULT_ALLOW_TURN_OFF,
-    DEFAULT_COMMAND_TIMEOUT,
-    DEFAULT_DISCONNECT_MODE,
-    DEFAULT_INVOKE_SHELL,
-    DEFAULT_LOAD_SYSTEM_HOST_KEYS,
-    DEFAULT_PORT,
-    AuthenticationError,
-    Collection,
-    CommandError,
-    ConnectError,
-    ExecutionError,
-    HostKeyUnknownError,
-    NameKeyError,
-    OfflineError,
-    SensorError,
-    SSHManager,
-    SSHTerminal,
-    default_collections,
-)
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.components.binary_sensor import (
     DEVICE_CLASSES_SCHEMA as BINARY_SENSOR_DEVICE_CLASSES_SCHEMA,
@@ -37,6 +15,8 @@ from homeassistant.components.button import (
 )
 from homeassistant.components.number import (
     DEVICE_CLASSES_SCHEMA as NUMBER_DEVICE_CLASSES_SCHEMA,
+)
+from homeassistant.components.number import (
     NumberMode,
 )
 from homeassistant.components.sensor import (
@@ -85,6 +65,27 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 from homeassistant.util import slugify
+from ssh_terminal_manager import (
+    DEFAULT_ADD_HOST_KEYS,
+    DEFAULT_ALLOW_TURN_OFF,
+    DEFAULT_COMMAND_TIMEOUT,
+    DEFAULT_DISCONNECT_MODE,
+    DEFAULT_INVOKE_SHELL,
+    DEFAULT_LOAD_SYSTEM_HOST_KEYS,
+    DEFAULT_PORT,
+    AuthenticationError,
+    Collection,
+    CommandError,
+    ConnectError,
+    ExecutionError,
+    HostKeyUnknownError,
+    NameKeyError,
+    OfflineError,
+    SensorError,
+    SSHManager,
+    SSHTerminal,
+    default_collections,
+)
 
 from .const import (
     CONF_ACTION_COMMANDS,
@@ -124,6 +125,7 @@ from .const import (
     DOMAIN,
 )
 from .converter import Converter
+from .logger import PayloadFreeLogger
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -627,7 +629,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return None
 
-    def get_options(self, manager: SSHManager) -> dict:
+    def get_options(self, manager: Collection) -> dict:
         """Get options from manager."""
         converter = Converter(self.hass)
         return {
@@ -660,14 +662,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             invoke_shell=data[CONF_INVOKE_SHELL],
         )
 
+        collection = (
+            getattr(default_collections, key)
+            if (key := data[CONF_DEFAULT_COMMANDS]) != "none"
+            else None
+        )
+        if collection:
+            # Discovery also substitutes device output (e.g. interface names).
+            # Copy defaults through the guarded integration command classes.
+            collection = Converter(self.hass).get_collection(
+                self.get_options(collection)
+            )
         manager = SSHManager(
             terminal,
-            collection=(
-                getattr(default_collections, key)
-                if (key := data[CONF_DEFAULT_COMMANDS]) != "none"
-                else None
-            ),
-            logger=self.logger,
+            collection=collection,
+            logger=PayloadFreeLogger(self.logger),
         )
 
         await manager.async_load_host_keys()
@@ -715,6 +724,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not self._existing_entry:
             return await self.async_step_mac_address()
 
+        detected_mac = self._data.get(CONF_MAC)
+        if not detected_mac or format_mac(detected_mac) != format_mac(
+            self._existing_entry.data[CONF_MAC]
+        ):
+            return self.async_abort(reason="device_identity_mismatch")
+
         return self.async_update_reload_and_abort(
             self._existing_entry,
             data={
@@ -736,6 +751,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         placeholders: dict[str, str] = {}
         if user_input is not None:
+            if self._existing_entry:
+                user_input = {
+                    **user_input,
+                    CONF_DEFAULT_COMMANDS: self._existing_entry.data[
+                        CONF_DEFAULT_COMMANDS
+                    ],
+                }
             self._data = user_input
             try:
                 if user_input[CONF_ADD_HOST_KEYS] and not user_input.get(
@@ -769,12 +791,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 return await self.async_handle_step_user_success()
 
+        schema = CONFIG_FLOW_USER_SCHEMA
+        if self._existing_entry:
+            schema = vol.Schema(
+                {
+                    key: value
+                    for key, value in schema.schema.items()
+                    if str(key) != CONF_DEFAULT_COMMANDS
+                }
+            )
         return self.async_show_form(
             step_id="user",
             errors=errors,
             description_placeholders=placeholders,
             data_schema=self.add_suggested_values_to_schema(
-                CONFIG_FLOW_USER_SCHEMA,
+                schema,
                 {
                     **self._data,
                     CONF_PORT: self._data.get(CONF_PORT, DEFAULT_PORT),

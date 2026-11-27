@@ -1,10 +1,10 @@
-from dataclasses import dataclass
-
-from ssh_terminal_manager import ActionKey, SensorKey, SSHManager
+from collections.abc import Callable
+from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.helpers.device_registry import DeviceEntry
+from ssh_terminal_manager import ActionKey, SensorKey, SSHManager
 
 from .coordinator import BaseCoordinator, SensorCommandCoordinator, StateCoordinator
 
@@ -20,6 +20,9 @@ class EntryData:
     ignored_sensor_keys: list[SensorKey] | None = None
     device_entry: DeviceEntry | None = None
 
+    unsubscribe_callbacks: list[Callable] = field(default_factory=list)
+    _shutdown: bool = field(default=False, init=False)
+
     @property
     def coordinators(self) -> list[BaseCoordinator]:
         """All coordinators of the config entry."""
@@ -27,7 +30,14 @@ class EntryData:
 
     async def async_shutdown(self) -> None:
         """Shutdown all coordinators and reset manager."""
-        for coordinator in self.coordinators:
-            await coordinator.async_shutdown()
-
-        await self.manager.async_reset()
+        if self._shutdown:
+            return
+        self._shutdown = True
+        for unsubscribe in self.unsubscribe_callbacks:
+            unsubscribe()
+        self.unsubscribe_callbacks.clear()
+        try:
+            for coordinator in self.coordinators:
+                await coordinator.async_shutdown()
+        finally:
+            await self.manager.async_reset()
