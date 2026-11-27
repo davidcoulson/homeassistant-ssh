@@ -54,8 +54,6 @@ from .const import (
     CONF_TIMEOUT_SET,
 )
 from .helpers import (
-    SafeActionCommand,
-    SafeCommand,
     get_command_renderer,
     get_value_renderer,
 )
@@ -168,7 +166,7 @@ class Converter:
             "renderer": get_value_renderer(self._hass, value_template)
             if (value_template := data.get(CONF_VALUE_TEMPLATE))
             else None,
-            "command_set": SafeCommand(
+            "command_set": Command(
                 string,
                 timeout=data.get(CONF_TIMEOUT_SET),
                 renderer=get_command_renderer(self._hass),
@@ -246,14 +244,14 @@ class Converter:
     def _get_binary_sensor_kwargs(self, data: dict) -> dict:
         return {
             **self._get_sensor_kwargs(data),
-            "command_on": SafeCommand(
+            "command_on": Command(
                 string,
                 timeout=data.get(CONF_TIMEOUT_ON),
                 renderer=get_command_renderer(self._hass),
             )
             if (string := data.get(CONF_COMMAND_ON))
             else None,
-            "command_off": SafeCommand(
+            "command_off": Command(
                 string,
                 timeout=data.get(CONF_TIMEOUT_OFF),
                 renderer=get_command_renderer(self._hass),
@@ -368,7 +366,7 @@ class Converter:
         return Collection(
             "",
             [
-                SafeActionCommand(**self.get_action_command_kwargs(command_data))
+                ActionCommand(**self.get_action_command_kwargs(command_data))
                 for command_data in options[CONF_ACTION_COMMANDS]
             ],
             [

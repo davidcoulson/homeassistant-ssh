@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-import shlex
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceRegistry
 from homeassistant.helpers.entity_platform import EntityPlatform
 from homeassistant.helpers.template import Template
 from homeassistant.util.unit_conversion import InformationConverter
-from ssh_terminal_manager import ActionCommand, Command, Sensor, SensorKey, SSHManager
+from ssh_terminal_manager import Sensor, SensorKey, SSHManager
 
 from .base_entity import BaseSensorEntity
 from .entry_data import EntryData
@@ -20,34 +19,6 @@ def get_command_renderer(hass: HomeAssistant) -> Callable:
         return template.async_render(parse_result=False)
 
     return async_renderer
-
-
-def quote_variable(value) -> str:
-    """Shell-quote a value and keep it from being rendered as a template."""
-    quoted = shlex.quote(str(value))
-    if "{" not in quoted:
-        return quoted
-    # The command is rendered after substitution; emit the value as a literal.
-    # "&" is escaped so that sensor placeholders are not substituted into it.
-    literal = quoted.replace("\\", "\\\\").replace('"', '\\"').replace("&", "\\x26")
-    return '{{ "' + literal + '" }}'
-
-
-class SafeRenderMixin:
-    """Quote variables before they are substituted into the command string."""
-
-    async def async_render_string(self, manager, variables=None):
-        if variables:
-            variables = {k: quote_variable(v) for k, v in variables.items()}
-        return await super().async_render_string(manager, variables)
-
-
-class SafeCommand(SafeRenderMixin, Command):
-    """Command with quoted variables."""
-
-
-class SafeActionCommand(SafeRenderMixin, ActionCommand):
-    """Action command with quoted variables."""
 
 
 def get_value_renderer(hass: HomeAssistant, value_template: str) -> Callable:

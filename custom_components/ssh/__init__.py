@@ -29,7 +29,8 @@ from homeassistant.core import (
     SupportsResponse,
 )
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr, entity_platform
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.service import (
     async_extract_config_entry_ids,
     async_extract_entities,
@@ -326,6 +327,21 @@ def async_register_services(hass: HomeAssistant, domain: str):
     def get_response(coro: Coroutine):
         @wraps(coro)
         async def wrapper(call: ServiceCall) -> ServiceResponse | None:
+            if coro.__name__ == "set_value":
+                # Reject bad pairings before any host is written to.
+                entity_ids = call.data[ATTR_ENTITY_ID]
+                if len(entity_ids) != len(call.data[CONF_VALUES]) or len(
+                    set(entity_ids)
+                ) != len(entity_ids):
+                    raise ServiceValidationError("Provide exactly one value per entity")
+                known = {
+                    entity.entity_id
+                    for platform in entity_platform.async_get_platforms(hass, domain)
+                    for entity in platform.entities.values()
+                    if isinstance(entity, BaseSensorEntity)
+                }
+                if not known.issuperset(entity_ids):
+                    raise ServiceValidationError("Unknown SSH sensor entity")
             entry_ids = await async_extract_config_entry_ids(call)
             # Targets may include other integrations' entries or entries not loaded.
             entries_data = [

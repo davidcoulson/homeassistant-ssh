@@ -23,6 +23,7 @@ def services():
         coordinator = object()
         entries[host] = NS(
             state_coordinator=coordinator,
+            device_entry=object(),
             manager=NS(
                 async_set_sensor_values=AsyncMock(return_value=([], [None, None])),
                 async_poll_sensors=AsyncMock(return_value=([], [None, None])),
@@ -85,6 +86,9 @@ def services():
             "RUN_ACTION_SCHEMA": None,
             "SupportsResponse": NS(OPTIONAL=None),
             "async_extract_config_entry_ids": extract_entries,
+            "async_register_admin_service": lambda hass, domain, name, handler, *args: registered.update(
+                {name: handler}
+            ),
             "async_extract_entities": extract_entities,
             "entity_platform": NS(
                 async_get_platforms=lambda *args: [

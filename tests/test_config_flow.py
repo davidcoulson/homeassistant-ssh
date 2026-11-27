@@ -34,6 +34,7 @@ def flow_methods():
         "DEFAULT_ADD_HOST_KEYS": False,
         "DEFAULT_LOAD_SYSTEM_HOST_KEYS": False,
         "DEFAULT_INVOKE_SHELL": False,
+        "HostKeysFileRequiredError": type("HostKeysFileRequiredError", (Exception,), {}),
     }
     exec(compile(tree, "config_flow.py", "exec"), ns)  # noqa: S102 - execute repository definitions with explicit fakes
     return ns
@@ -95,7 +96,7 @@ async def test_reconfigure_preserves_collection_even_if_submitted():
         async_validate_user=AsyncMock(return_value=({}, {})),
         async_handle_step_user_success=AsyncMock(),
     )
-    await ns["async_step_user"](flow, {"host": "same-host", "default_commands": "none"})
+    await ns["async_step_user"](flow, {"host": "same-host", "default_commands": "none", "add_host_keys": False})
     flow.async_validate_user.assert_awaited_once_with(
-        {"host": "same-host", "default_commands": "linux"}
+        {"host": "same-host", "default_commands": "linux", "add_host_keys": False}
     )
